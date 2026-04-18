@@ -30,3 +30,8 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+vm/seed/user-data
+vm/base/*
+vm/disks/*
+vm/seed/seed.iso
