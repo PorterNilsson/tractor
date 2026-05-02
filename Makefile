@@ -1,54 +1,81 @@
-VM_DIR=./vm
-BASE_IMAGE=$(VM_DIR)/base/debian-base.qcow2
-VM_DISK=$(VM_DIR)/disks/debian.qcow2
-SEED_DIR := $(VM_DIR)/seed
-SEED_ISO=$(SEED_DIR)/seed.iso
-SSH_KEY := $(HOME)/.ssh/tractor
-SSH_PUB_KEY := $(SSH_KEY).pub
-
-$(BASE_IMAGE):
-	mkdir -p $(VM_DIR)/base
-	curl -L -o $(BASE_IMAGE) \
-		https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-arm64.qcow2
-
-$(VM_DISK): $(BASE_IMAGE)
-	mkdir -p $(VM_DIR)/disks
-	qemu-img create -f qcow2 \
-		-b "$(abspath $(BASE_IMAGE))" \
-		-F qcow2 \
-		$(VM_DISK)
-
-$(SSH_PUB_KEY):
-	ssh-keygen -t ed25519 -f $(SSH_KEY) -N ""
-
-$(SEED_DIR)/user-data: $(SSH_PUB_KEY)
-	./vm/seed/user-data.sh
-
-$(SEED_ISO): $(SEED_DIR)/user-data $(SEED_DIR)/meta-data
-	hdiutil makehybrid \
-		-o $(SEED_ISO) \
-		-iso \
-		-joliet \
-		-default-volume-name cidata \
-		$(SEED_DIR)
+VM_CLOUD_IMAGE = vm/debian.qcow2
+VM_COPY_ON_WRITE = vm/debian-cow.qcow2
+CLOUD_INIT_META_DATA = vm/meta-data
+CLOUD_INIT_USER_DATA = vm/user-data
+SSH_KEY = ~/.ssh/tractor
 
 build:
-	go build -o ./bin/tractor ./cmd/tractor
+	go build -o bin/tractor cmd/tractor
 
 run:
-	go run ./cmd/tractor
+	go run cmd/tractor
 
-dev-up: $(VM_DISK) $(SEED_ISO)
+clean:
+	rm -f $(VM_COPY_ON_WRITE)
+	rm -f $(CLOUD_INIT_META_DATA)
+	rm -f $(CLOUD_INIT_USER_DATA)
+	rm -f $(SSH_KEY).pub
+	rm -f $(SSH_KEY)
+
+dev-up: $(VM_COPY_ON_WRITE) $(CLOUD_INIT_META_DATA)
 	qemu-system-aarch64 \
 		-machine virt,accel=hvf \
 		-cpu host \
 		-smp 4 \
 		-m 4096 \
-		-drive if=virtio,file=$(VM_DISK),format=qcow2 \
-		-drive if=virtio,file=$(SEED_ISO),format=raw \
+		-bios /opt/homebrew/share/qemu/edk2-aarch64-code.fd \
+		-drive if=virtio,file=$(VM_COPY_ON_WRITE),format=qcow2 \
 		-netdev user,id=net0,hostfwd=tcp::2222-:22 \
 		-device virtio-net-pci,netdev=net0 \
 		-nographic \
-		-serial mon:stdio
+		-serial stdio \
+		-monitor none \
+		-smbios type=1,serial=ds='nocloud;s=http://10.0.2.2:8000/'
 
 dev-down:
+
+$(VM_CLOUD_IMAGE):
+	curl -L -o $(VM_CLOUD_IMAGE) https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-arm64.qcow2
+
+$(VM_COPY_ON_WRITE): $(VM_CLOUD_IMAGE)
+	qemu-img create -f qcow2 \
+		-b '$(abspath $(VM_CLOUD_IMAGE))' \
+		-F qcow2 \
+		'$(abspath $(VM_COPY_ON_WRITE))'
+
+$(CLOUD_INIT_META_DATA): $(CLOUD_INIT_USER_DATA)
+	echo "instance-id: tractor-$(shell date +%s)" > $(CLOUD_INIT_META_DATA)
+	echo "local-hostname: tractor" >> $(CLOUD_INIT_META_DATA)
+	python3 vm/imds_server.py &
+
+$(SSH_KEY).pub:
+	ssh-keygen -t ed25519 -f $(SSH_KEY) -N ""
+
+$(CLOUD_INIT_USER_DATA): $(SSH_KEY).pub
+	@PUB_KEY=$$(cat $(SSH_KEY).pub); \
+	printf "%s\n" \
+"#cloud-config" \
+"" \
+"# ===== Users =====" \
+"users:" \
+"  - name: tractor" \
+"    groups: [sudo]" \
+"    shell: /bin/bash" \
+"    sudo: ALL=(ALL) NOPASSWD:ALL" \
+"    lock_passwd: true" \
+"    ssh_authorized_keys:" \
+"      - $$PUB_KEY" \
+"" \
+"# ===== SSH config =====" \
+"ssh_pwauth: false" \
+"disable_root: true" \
+"" \
+"# ===== System updates =====" \
+"package_update: true" \
+"package_upgrade: true" \
+"" \
+"# ===== Provisioning =====" \
+"runcmd:" \
+"  - apt update" \
+"  - apt install -y ca-certificates curl" \
+> $(CLOUD_INIT_USER_DATA)

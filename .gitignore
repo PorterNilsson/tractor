@@ -31,7 +31,7 @@ go.work.sum
 # .idea/
 # .vscode/
 
-vm/seed/user-data
-vm/base/*
-vm/disks/*
-vm/seed/seed.iso
+vm/meta-data
+vm/user-data
+vm/debian.qcow2
+vm/debian-cow.qcow2
