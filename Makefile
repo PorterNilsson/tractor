@@ -29,8 +29,7 @@ dev-up: $(VM_COPY_ON_WRITE) $(CLOUD_INIT_META_DATA)
 		-device virtio-net-pci,netdev=net0 \
 		-nographic \
 		-serial stdio \
-		-monitor none \
-		-smbios type=1,serial=ds='nocloud;s=http://10.0.2.2:8000/'
+		-monitor none
 
 dev-down:
 
@@ -47,6 +46,19 @@ $(CLOUD_INIT_META_DATA): $(CLOUD_INIT_USER_DATA)
 	echo "instance-id: tractor-$(shell date +%s)" > $(CLOUD_INIT_META_DATA)
 	echo "local-hostname: tractor" >> $(CLOUD_INIT_META_DATA)
 	python3 vm/imds_server.py &
+	qemu-system-aarch64 \
+		-machine virt,accel=hvf \
+		-cpu host \
+		-smp 4 \
+		-m 4096 \
+		-bios /opt/homebrew/share/qemu/edk2-aarch64-code.fd \
+		-drive if=virtio,file=$(VM_COPY_ON_WRITE),format=qcow2 \
+		-netdev user,id=net0,hostfwd=tcp::2222-:22 \
+		-device virtio-net-pci,netdev=net0 \
+		-nographic \
+		-serial stdio \
+		-monitor none \
+		-smbios type=1,serial=ds='nocloud;s=http://10.0.2.2:8000/'
 
 $(SSH_KEY).pub:
 	ssh-keygen -t ed25519 -f $(SSH_KEY) -N ""
@@ -78,4 +90,7 @@ $(CLOUD_INIT_USER_DATA): $(SSH_KEY).pub
 "runcmd:" \
 "  - apt update" \
 "  - apt install -y ca-certificates curl" \
+"  - poweroff" \
 > $(CLOUD_INIT_USER_DATA)
+
+# ssh -i ~/.ssh/tractor -p 2222 -o StrictHostKeyChecking=no tractor@localhost
