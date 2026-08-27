@@ -40,3 +40,4 @@ vm/debian-cow.qcow2
 .DS_Store
 
 # Project
+bin/

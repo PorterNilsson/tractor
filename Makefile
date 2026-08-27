@@ -5,7 +5,7 @@ CLOUD_INIT_USER_DATA = vm/user-data
 SSH_KEY = ~/.ssh/tractor
 
 build:
-	go build -o bin/tractor cmd/tractor
+	go build -o bin/tractor ./cmd/tractor
 
 run:
 	go run cmd/tractor
@@ -91,3 +91,5 @@ $(CLOUD_INIT_USER_DATA): $(SSH_KEY).pub
 "runcmd:" \
 "  - poweroff" \
 > $(CLOUD_INIT_USER_DATA)
+
+# scp ~/.gitconfig tractor@tractor:~/.gitconfig
