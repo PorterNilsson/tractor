@@ -31,8 +31,6 @@ dev-up: $(VM_COPY_ON_WRITE) $(CLOUD_INIT_META_DATA)
 		-serial stdio \
 		-monitor none
 
-dev-down:
-
 $(VM_CLOUD_IMAGE):
 	curl -L -o $(VM_CLOUD_IMAGE) https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-arm64.qcow2
 
@@ -64,7 +62,7 @@ $(SSH_KEY).pub:
 	ssh-keygen -t ed25519 -f $(SSH_KEY) -N ""
 
 $(CLOUD_INIT_USER_DATA): $(SSH_KEY).pub
-	@PUB_KEY=$$(cat $(SSH_KEY).pub); \
+	PUB_KEY=$$(cat $(SSH_KEY).pub); \
 	printf "%s\n" \
 "#cloud-config" \
 "" \
@@ -85,12 +83,11 @@ $(CLOUD_INIT_USER_DATA): $(SSH_KEY).pub
 "# ===== System updates =====" \
 "package_update: true" \
 "package_upgrade: true" \
+"packages:" \
+"  - git" \
+"  - golang" \
 "" \
 "# ===== Provisioning =====" \
 "runcmd:" \
-"  - apt update" \
-"  - apt install -y ca-certificates curl" \
 "  - poweroff" \
 > $(CLOUD_INIT_USER_DATA)
-
-# ssh -i ~/.ssh/tractor -p 2222 -o StrictHostKeyChecking=no tractor@localhost
