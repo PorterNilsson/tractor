@@ -5,10 +5,10 @@ CLOUD_INIT_USER_DATA = vm/user-data
 SSH_KEY = ~/.ssh/tractor
 
 build:
-	go build -o bin/tractor ./cmd/tractor
+	go build -o ./bin/tractor ./cmd/tractor
 
 run:
-	go run cmd/tractor
+	go run ./cmd/tractor
 
 clean:
 	rm -f $(VM_COPY_ON_WRITE)
