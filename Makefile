@@ -86,6 +86,7 @@ $(CLOUD_INIT_USER_DATA): $(SSH_KEY).pub
 "packages:" \
 "  - git" \
 "  - golang" \
+"  - make" \
 "" \
 "# ===== Provisioning =====" \
 "runcmd:" \
