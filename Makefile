@@ -7,8 +7,8 @@ SSH_KEY = ~/.ssh/tractor
 build:
 	go build -o ./bin/tractor ./cmd/tractor
 
-run:
-	go run ./cmd/tractor
+run: build
+	./bin/tractor
 
 clean:
 	rm -f $(VM_COPY_ON_WRITE)
